@@ -30,7 +30,7 @@ namespace Machina.FFXIV
         private int _allocated;
         private int _set;
 
-        private Oodle.Oodle _oodle;
+        private Oodle.IOodleWrapper _oodle;
 
         public Queue<Tuple<long, byte[], int>> Messages = new Queue<Tuple<long, byte[], int>>(20);
 
@@ -94,9 +94,20 @@ namespace Machina.FFXIV
                         }
                         return;
                     }
+
+                    // Do not process if there is no payload
+                    if (header.length == sizeof(Server_BundleHeader))
+                    {
+                        offset += sizeof(Server_BundleHeader);
+                        if (offset == _allocated)
+                            _bundleBuffer = null;
+                        continue;
+                    }
+
                     byte[] message = DecompressFFXIVMessage(ref header, _bundleBuffer, offset, out int messageBufferSize);
                     if (message == null || messageBufferSize <= 0)
                     {
+                        Trace.WriteLine($"FFXIVBundleDecode() - Resetting stream. Message Null:{message == null}, Buffer Size:{messageBufferSize}");
                         offset = ResetStream(offset);
                         continue;
                     }
@@ -127,8 +138,11 @@ namespace Machina.FFXIV
                                 message_offset += message_length;
                                 if (message_offset > messageBufferSize)
                                 {
-                                    Trace.WriteLine($"FFXIVBundleDecoder: Bad message offset - offset={message_offset}, bufferSize={messageBufferSize}, " +
-                                        $"data: {ConversionUtility.ByteArrayToHexString(data, 0, 50)}", "DEBUG-MACHINA");
+                                    if (_oodle == null)
+                                    {
+                                        Trace.WriteLine($"FFXIVBundleDecoder: Bad message offset - offset={message_offset}, bufferSize={messageBufferSize}, " +
+                                            $"data: {ConversionUtility.ByteArrayToHexString(data, 0, 50)}", "DEBUG-MACHINA");
+                                    }
 
                                     _allocated = 0;
                                     return;
@@ -226,6 +240,8 @@ namespace Machina.FFXIV
 
         private unsafe int ResetStream(int offset)
         {
+            Trace.WriteLine($"FFXIVBundleDecoder: Resetting FFXIV Stream, new offset: {offset}", "DEBUG-MACHINA");
+
             offset = GetNextMagicNumberPos(_bundleBuffer, offset);
             if (offset == -1)
             {
