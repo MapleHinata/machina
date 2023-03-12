@@ -108,20 +108,20 @@ namespace Machina.FFXIV.Deucalion
         private byte[] _streamBuffer = new byte[short.MaxValue * 2];
         private int _streamBufferIndex = 0;
 
-        public delegate void MessageReceivedHandler(byte[] message, FFXIVChannel channel, bool isSend);
+        public delegate void MessageReceivedHandler(byte[] message, FFXIVChannel channel);
         public MessageReceivedHandler MessageReceived;
         
-        public delegate void MessageSentHandler(byte[] message, FFXIVChannel channel, bool isSend);
+        public delegate void MessageSentHandler(byte[] message, FFXIVChannel channel);
         public MessageSentHandler MessageSent;
 
         public void OnMessageReceived(byte[] message, FFXIVChannel channel)
         {
-            MessageReceived?.Invoke(message, channel, false);
+            MessageReceived?.Invoke(message, channel);
         }
         
         public void OnMessageSent(byte[] message, FFXIVChannel channel)
         {
-            MessageSent?.Invoke(message, channel, true);
+            MessageSent?.Invoke(message, channel);
         }
 
         public unsafe void Connect(int processId)
@@ -206,13 +206,16 @@ namespace Machina.FFXIV.Deucalion
 
                         foreach (DeucalionMessage message in messages)
                         {
-                            if (message.header.Opcode == FFXIVOpcodes.Recv)
-                                OnMessageReceived(message.data, message.header.channel);
-                            
-                            if (message.header.Opcode == FFXIVOpcodes.Send)
-                                OnMessageSent(message.data, message.header.channel);
+                            switch (message.header.Opcode)
+                            {
+                                case FFXIVOpcodes.Recv:
+                                    OnMessageReceived(message.data, message.header.channel);
+                                    break;
+                                case FFXIVOpcodes.Send:
+                                    OnMessageSent(message.data, message.header.channel);
+                                    break;
+                            }
                         }
-                            
                     }
                     catch (OperationCanceledException)
                     {

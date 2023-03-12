@@ -142,8 +142,8 @@ namespace Machina.FFXIV
                 DeucalionInjector.InjectLibrary((int)ProcessID, library);
 
                 _deucalionClient = new DeucalionClient();
-                _deucalionClient.MessageSent = (message, channel, isSend) => ProcessDeucalionMessage(message, channel, isSend);
-                _deucalionClient.MessageReceived = (message, channel, isSend) => ProcessDeucalionMessage(message, channel, isSend);
+                _deucalionClient.MessageSent = (message, channel) => ProcessDeucalionMessage(message, channel, true);
+                _deucalionClient.MessageReceived = (message, channel) => ProcessDeucalionMessage(message, channel, false);
                 _deucalionClient.Connect((int)ProcessID);
             }
             else
