@@ -13,7 +13,7 @@ namespace Machina.FFXIV.Deucalion
 {
     public class DeucalionClient : IDisposable
     {
-        private enum FFXIVChannel : uint
+        public enum FFXIVChannel : uint
         {
             /// <summary>
             ///   Currently unimplemented.
@@ -91,6 +91,7 @@ namespace Machina.FFXIV.Deucalion
             public ushort reserved; //0x0014
             public ushort type; //opcode
             public ushort padding;
+            public ushort routeID;
             public ushort server;
             public uint seconds;
             public uint padding1;
@@ -107,11 +108,20 @@ namespace Machina.FFXIV.Deucalion
         private byte[] _streamBuffer = new byte[short.MaxValue * 2];
         private int _streamBufferIndex = 0;
 
-        public delegate void MessageReceivedHandler(byte[] message);
+        public delegate void MessageReceivedHandler(byte[] message, FFXIVChannel channel, bool isSend);
         public MessageReceivedHandler MessageReceived;
-        public void OnMessageReceived(byte[] message)
+        
+        public delegate void MessageSentHandler(byte[] message, FFXIVChannel channel, bool isSend);
+        public MessageSentHandler MessageSent;
+
+        public void OnMessageReceived(byte[] message, FFXIVChannel channel)
         {
-            MessageReceived?.Invoke(message);
+            MessageReceived?.Invoke(message, channel, false);
+        }
+        
+        public void OnMessageSent(byte[] message, FFXIVChannel channel)
+        {
+            MessageSent?.Invoke(message, channel, true);
         }
 
         public unsafe void Connect(int processId)
@@ -137,18 +147,18 @@ namespace Machina.FFXIV.Deucalion
                     return;
                 }
 
-                // Set opcode filter to just recv for zone packets.  Assume it was processed successfully.
+                // Set opcode filter to get recv/send for zone and lobby packets.  Assume it was processed successfully.
                 WritePipe(new DeucalionMessage()
                 {
                     header = new DeucalionHeader()
                     {
-                        channel = (FFXIVChannel)(1 << 1),
+                        channel = (FFXIVChannel)(1 << 0 | 1 << 1 | 1 << 3 | 1 << 4 ),
                         Opcode = FFXIVOpcodes.Option
                     },
                     data = Array.Empty<byte>()
                 });
 
-                if (result.debug.Contains("RECV REQUIRES SIG"))
+                if (result.debug.Contains("REQUIRES SIG"))
                 {
                     Trace.WriteLine("DeucalionClient: Named Pipe connected, but requires updated signature.  Cannot find network data.");
                     return;
@@ -195,8 +205,14 @@ namespace Machina.FFXIV.Deucalion
                         }
 
                         foreach (DeucalionMessage message in messages)
+                        {
                             if (message.header.Opcode == FFXIVOpcodes.Recv)
-                                OnMessageReceived(message.data);
+                                OnMessageReceived(message.data, message.header.channel);
+                            
+                            if (message.header.Opcode == FFXIVOpcodes.Send)
+                                OnMessageSent(message.data, message.header.channel);
+                        }
+                            
                     }
                     catch (OperationCanceledException)
                     {
@@ -289,7 +305,11 @@ namespace Machina.FFXIV.Deucalion
                             response.Add(newMessage);
                             break;
                         case FFXIVOpcodes.Recv:
-                            if (messagePtr->channel == FFXIVChannel.Zone)
+                            if (messagePtr->channel == FFXIVChannel.Zone || messagePtr->channel == FFXIVChannel.Lobby)
+                                response.Add(newMessage);
+                            break;
+                        case FFXIVOpcodes.Send:
+                            if (messagePtr->channel == FFXIVChannel.Zone || messagePtr->channel == FFXIVChannel.Lobby)
                                 response.Add(newMessage);
                             break;
                         case FFXIVOpcodes.Exit:
@@ -363,6 +383,7 @@ namespace Machina.FFXIV.Deucalion
                     headerPtr->ActorID = segmentPtr->source_actor;
                     headerPtr->Unknown2 = segmentPtr->reserved;
                     headerPtr->MessageType = segmentPtr->type;
+                    headerPtr->RouteID = segmentPtr->routeID;
                     headerPtr->Seconds = segmentPtr->seconds;
 
                     epoch = segmentPtr->timestamp;

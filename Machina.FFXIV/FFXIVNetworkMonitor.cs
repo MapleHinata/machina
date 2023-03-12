@@ -135,11 +135,15 @@ namespace Machina.FFXIV
 
             if (UseDeucalion)
             {
+                if (ProcessID == 0)
+                    ProcessID = ProcessTCPInfo.GetProcessIDByWindow(null, WindowName)[0];
+                    
                 string library = DeucalionInjector.ExtractLibrary();
                 DeucalionInjector.InjectLibrary((int)ProcessID, library);
 
                 _deucalionClient = new DeucalionClient();
-                _deucalionClient.MessageReceived = (byte[] message) => ProcessDeucalionMessage(message);
+                _deucalionClient.MessageSent = (message, channel, isSend) => ProcessDeucalionMessage(message, channel, isSend);
+                _deucalionClient.MessageReceived = (message, channel, isSend) => ProcessDeucalionMessage(message, channel, isSend);
                 _deucalionClient.Connect((int)ProcessID);
             }
             else
@@ -222,7 +226,7 @@ namespace Machina.FFXIV
 
         }
 
-        public void ProcessDeucalionMessage(byte[] data)
+        public void ProcessDeucalionMessage(byte[] data, DeucalionClient.FFXIVChannel channel, bool isSend)
         {
             // TCP Connection is irrelevent for this, but needed by interface, so make new one.
             TCPConnection connection = new TCPConnection();
@@ -230,7 +234,18 @@ namespace Machina.FFXIV
 
             (long epoch, byte[] packet) = DeucalionClient.ConvertDeucalionFormatToPacketFormat(data);
 
-            OnMessageReceived(connection, epoch, packet);
+            ConnectionType connectionType = ConnectionType.Game;
+
+            if (channel == DeucalionClient.FFXIVChannel.Lobby) connectionType = ConnectionType.Lobby;
+
+            if (isSend)
+            {
+                OnMessageSent(connection, epoch, packet, 0, connectionType);
+            }
+            else
+            {
+                OnMessageReceived(connection, epoch, packet, 0, connectionType);
+            }
         }
 
 
