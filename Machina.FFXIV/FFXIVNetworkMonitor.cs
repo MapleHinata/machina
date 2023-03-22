@@ -230,7 +230,7 @@ namespace Machina.FFXIV
 
         }
 
-        public void ProcessDeucalionMessage(byte[] data, DeucalionClient.FFXIVChannel channel, bool isSend)
+        public void ProcessDeucalionMessage(byte[] data, DeucalionClient.DeucalionChannel channel, bool isSend)
         {
             // TCP Connection is irrelevent for this, but needed by interface, so make new one.
             TCPConnection connection = new TCPConnection();
@@ -240,7 +240,7 @@ namespace Machina.FFXIV
 
             ConnectionType connectionType = ConnectionType.Game;
 
-            if (channel == DeucalionClient.FFXIVChannel.Lobby) connectionType = ConnectionType.Lobby;
+            if (channel == DeucalionClient.DeucalionChannel.Lobby) connectionType = ConnectionType.Lobby;
 
             if (isSend)
             {
