@@ -237,14 +237,18 @@ namespace Machina.FFXIV
             connection.ProcessId = ProcessID;
 
             (long epoch, byte[] packet) = DeucalionClient.ConvertDeucalionFormatToPacketFormat(data);
-
+            
+            //TODO: Machina is configured to only capture Zone connections with Deucalion, should we also capture lobby?
+            ConnectionType connectionType = ConnectionType.Game;
+            
             if (isSend)
             {
-                OnMessageSent(connection, epoch, packet);
+                //What is even sets supposed to be, anyway? They only alternate between 0-1 normally, and seems to be unused by ffxivmon....
+                OnMessageSent(connection, epoch, packet, 0, connectionType);
             }
             else
             {
-                OnMessageReceived(connection, epoch, packet);
+                OnMessageReceived(connection, epoch, packet, 0, connectionType);
             }
         }
 
