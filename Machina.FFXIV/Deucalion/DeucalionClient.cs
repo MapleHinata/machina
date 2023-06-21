@@ -27,7 +27,7 @@ namespace Machina.FFXIV.Deucalion
 {
     public class DeucalionClient : IDisposable
     {
-        private enum DeucalionChannel : uint
+        public enum DeucalionChannel : uint
         {
             /// <summary>
             ///   Currently unimplemented.
@@ -162,20 +162,20 @@ namespace Machina.FFXIV.Deucalion
         private readonly byte[] _streamBuffer = new byte[short.MaxValue * 2];
         private int _streamBufferIndex;
 
-        public delegate void MessageReceivedHandler(byte[] message);
+        public delegate void MessageReceivedHandler(byte[] message, DeucalionChannel deucalionChannel, bool isOther);
         public MessageReceivedHandler MessageReceived;
 
-        public delegate void MessageSentHandler(byte[] message);
+        public delegate void MessageSentHandler(byte[] message, DeucalionChannel deucalionChannel, bool isOther);
         public MessageSentHandler MessageSent;
 
-        public void OnMessageReceived(byte[] message)
+        public void OnMessageReceived(byte[] message, DeucalionChannel deucalionChannel, bool isOther = false)
         {
-            MessageReceived?.Invoke(message);
+            MessageReceived?.Invoke(message, deucalionChannel, isOther);
         }
 
-        public void OnMessageSent(byte[] message)
+        public void OnMessageSent(byte[] message, DeucalionChannel deucalionChannel, bool isOther = false)
         {
-            MessageSent?.Invoke(message);
+            MessageSent?.Invoke(message, deucalionChannel, isOther);
         }
 
         public unsafe void Connect(int processId)
@@ -208,7 +208,9 @@ namespace Machina.FFXIV.Deucalion
                 {
                     header = new DeucalionHeader()
                     {
-                        channel = (DeucalionChannel)(DeucalionFilter.AllowReceivedZone | DeucalionFilter.AllowSentZone),
+                        channel = (DeucalionChannel)(DeucalionFilter.AllowReceivedZone | DeucalionFilter.AllowSentZone |
+                                                     DeucalionFilter.AllowSentLobby |
+                                                     DeucalionFilter.AllowReceivedLobby | DeucalionFilter.AllowOther),
                         Opcode = DeucalionOpcode.Option
                     },
                     data = Array.Empty<byte>()
@@ -240,7 +242,7 @@ namespace Machina.FFXIV.Deucalion
                         channel = (DeucalionChannel)9000,
                         Opcode = DeucalionOpcode.Debug,
                     },
-                    data = Encoding.UTF8.GetBytes("FFXIV_ACT_Plugin")
+                    data = Encoding.UTF8.GetBytes("FFXIVMon Reborn")
                 }, _tokenSource.Token);
             }
             catch (Exception ex)
@@ -286,10 +288,21 @@ namespace Machina.FFXIV.Deucalion
 
                         foreach (DeucalionMessage message in messages)
                         {
-                            if (message.header.Opcode == DeucalionOpcode.Recv)
-                                OnMessageReceived(message.data);
-                            if (message.header.Opcode == DeucalionOpcode.Send)
-                                OnMessageSent(message.data);
+                            switch (message.header.Opcode)
+                            {
+                                case DeucalionOpcode.Recv:
+                                    OnMessageReceived(message.data, message.header.channel);
+                                    break;
+                                case DeucalionOpcode.Send:
+                                    OnMessageSent(message.data, message.header.channel);
+                                    break;
+                                case DeucalionOpcode.RecvOther:
+                                    OnMessageReceived(message.data, message.header.channel, true);
+                                    break;
+                                case DeucalionOpcode.SendOther:
+                                    OnMessageSent(message.data, message.header.channel, true);
+                                    break;
+                            }
                         }
                     }
                     catch (OperationCanceledException)
@@ -392,12 +405,16 @@ namespace Machina.FFXIV.Deucalion
                             response.Add(newMessage);
                             break;
                         case DeucalionOpcode.Recv:
-                            if (messagePtr->channel == DeucalionChannel.Zone)
-                                response.Add(newMessage);
+                            response.Add(newMessage);
                             break;
                         case DeucalionOpcode.Send:
-                            if (messagePtr->channel == DeucalionChannel.Zone)
-                                response.Add(newMessage);
+                            response.Add(newMessage);
+                            break;
+                        case DeucalionOpcode.RecvOther:
+                            response.Add(newMessage);
+                            break;
+                        case DeucalionOpcode.SendOther:
+                            response.Add(newMessage);
                             break;
                         case DeucalionOpcode.Exit:
                             Trace.WriteLine("DeucalionClient: Received exit opcode from injected code.", "DEBUG-MACHINA");

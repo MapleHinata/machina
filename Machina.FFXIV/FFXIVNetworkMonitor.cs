@@ -144,8 +144,8 @@ namespace Machina.FFXIV
                 _ = DeucalionInjector.InjectLibrary((int)ProcessID, library);
 
                 _deucalionClient = new DeucalionClient();
-                _deucalionClient.MessageSent = (message) => ProcessDeucalionMessage(message, true);
-                _deucalionClient.MessageReceived = (message) => ProcessDeucalionMessage(message, false);
+                _deucalionClient.MessageSent = (message, channel, isOther) => ProcessDeucalionMessage(message, true, channel, isOther);
+                _deucalionClient.MessageReceived = (message, channel, isOther) => ProcessDeucalionMessage(message, false, channel, isOther);
                 _deucalionClient.Connect((int)ProcessID);
             }
             else
@@ -230,16 +230,21 @@ namespace Machina.FFXIV
 
         }
 
-        public void ProcessDeucalionMessage(byte[] data, bool isSend)
+        public void ProcessDeucalionMessage(byte[] data, bool isSend, DeucalionClient.DeucalionChannel channel,
+            bool isOther)
         {
             // TCP Connection is irrelevent for this, but needed by interface, so make new one.
             TCPConnection connection = new TCPConnection();
             connection.ProcessId = ProcessID;
-
-            (long epoch, byte[] packet) = DeucalionClient.ConvertDeucalionFormatToPacketFormat(data);
             
-            //TODO: Machina is configured to only capture Zone connections with Deucalion, should we also capture lobby?
             ConnectionType connectionType = ConnectionType.Game;
+
+            if (channel != DeucalionClient.DeucalionChannel.Zone)
+                connectionType =  ConnectionType.Lobby;
+            
+            (long epoch, byte[] packet) =
+                isOther ? (0, data) : DeucalionClient.ConvertDeucalionFormatToPacketFormat(data);
+            
             
             if (isSend)
             {
