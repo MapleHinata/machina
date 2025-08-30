@@ -6,12 +6,13 @@
     </PropertyGroup>
     
     <PropertyGroup>
-        <Version>2.3.7.5</Version>
-        <AssemblyVersion>2.3.7.5</AssemblyVersion>
-        <FileVersion>2.3.7.5</FileVersion>
+        <Version>2.4.3.4</Version>
+        <AssemblyVersion>2.4.3.4</AssemblyVersion>
+        <FileVersion>2.4.3.4</FileVersion>
         <EnableNETAnalyzers>true</EnableNETAnalyzers>
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     </PropertyGroup>
     
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'NuGet|AnyCPU' ">
@@ -26,15 +27,19 @@
         <RepositoryUrl>https://github.com/ravahn/machina</RepositoryUrl>
         <NeutralLanguage>en</NeutralLanguage>
         <Description>Extension to Machina network library to support decoding of Final Fantasy XIV network data</Description>
-        <Copyright>Copyright © 2022 Ravahn</Copyright>
+        <Copyright>Copyright © 2025 Ravahn</Copyright>
         <PackageProjectUrl>https://github.com/ravahn/machina</PackageProjectUrl>
         <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
+    
+    <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='NuGet|netstandard2.0|AnyCPU'">
+      <Optimize>True</Optimize>
+    </PropertyGroup>
  
     <ItemGroup>
-        <None Remove="Deucalion\Distrib\deucalion-0.9.3.dll" />
-        <None Remove="Deucalion\Distrib\deucalion-debug.dll" />
-        <None Remove="Ravahn.Machina.Keyfile.snk" />
+        <None Remove="Deucalion\Distrib\deucalion-1.2.1.dll" />
+        <None Remove="Deucalion\Distrib\deucalion-1.3.2.dll" />
+      <None Remove="Ravahn.Machina.Keyfile.snk" />
     </ItemGroup>
 
   <PropertyGroup>
@@ -58,7 +63,6 @@
     <RepositoryUrl>https://github.com/ravahn/machina</RepositoryUrl>
   </PropertyGroup>
     <ItemGroup>
-        <EmbeddedResource Include="Deucalion\Distrib\deucalion-0.9.3.dll" />
         <EmbeddedResource Include="Headers\Opcodes\Chinese.txt" />
         <EmbeddedResource Include="Headers\Opcodes\Global.txt" />
         <EmbeddedResource Include="Headers\Opcodes\Korean.txt" />
@@ -78,5 +82,20 @@
             <PackagePath></PackagePath>
         </None>
     </ItemGroup>
-
+  <ItemGroup>
+    <Content Include="Deucalion\Distrib\deucalion-1.2.1.dll">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <TargetPath>deucalion-1.2.1.dll</TargetPath>
+        <Pack>True</Pack>
+        <PackagePath>lib\$(TargetFrameworks)</PackagePath>
+        <PackageCopyToOutput>true</PackageCopyToOutput>
+    </Content>
+    <Content Include="Deucalion\Distrib\deucalion-1.3.2.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <TargetPath>deucalion-1.3.2.dll</TargetPath>
+        <Pack>True</Pack>
+        <PackagePath>lib\$(TargetFrameworks)</PackagePath>
+        <PackageCopyToOutput>true</PackageCopyToOutput>
+    </Content>
+  </ItemGroup>
 </Project>

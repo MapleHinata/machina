@@ -19,6 +19,7 @@ using System.IO.Pipes;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Machina.FFXIV.Headers;
@@ -200,6 +201,16 @@ namespace Machina.FFXIV.Deucalion
                 if (result.header.Opcode != DeucalionOpcode.Debug || !result.debug.StartsWith("SERVER HELLO", StringComparison.OrdinalIgnoreCase))
                 {
                     Trace.WriteLine($"DeucalionClient: Named pipe connected, but received unexpected response: ({result.header.Opcode} {result.debug}).", "DEBUG-MACHINA");
+                    Disconnect();
+                    return;
+                }
+                if (!Version.TryParse(new Regex("VERSION: (?<version>\\d*\\.\\d*\\.\\d*)\\. ").Match(result.debug)?.Groups["version"]?.Value,
+                        out Version ver)
+                    || ver < DeucalionInjector.DeucalionVersion)
+                {
+                    DeucalionInjector.LastInjectionError = $"Incorrect Deucalion version detected.  Received: {result.debug}, Parsed: {ver}, Expected: {DeucalionInjector.DeucalionVersion}.";
+                    Trace.WriteLine($"DeucalionClient: ERROR: Incorrect Deucalion version detected.  Received: {result.debug}, Parsed: {ver}, Expected: {DeucalionInjector.DeucalionVersion}.  Unable to retrieve network data.", "DEBUG-MACHINA");
+                    Disconnect();
                     return;
                 }
 
@@ -363,6 +374,7 @@ namespace Machina.FFXIV.Deucalion
 
             // process all data
             int index = 0;
+            int headerLength = sizeof(DeucalionHeader);
 
             fixed (byte* ptr = _streamBuffer)
             {
@@ -371,6 +383,12 @@ namespace Machina.FFXIV.Deucalion
                 while (index < _streamBufferIndex)
                 {
                     DeucalionHeader* messagePtr = (DeucalionHeader*)(ptr + index);
+
+                    // sanity check that we have a complete header
+                    if (_streamBufferIndex - index < headerLength)
+                    {
+                        break;
+                    }
 
                     // sanity check that we have a complete payload
                     if (messagePtr->Length > _streamBufferIndex - index)
@@ -406,6 +424,8 @@ namespace Machina.FFXIV.Deucalion
                             break;
                         case DeucalionOpcode.Recv:
                             response.Add(newMessage);
+                            else
+                                Trace.WriteLine($"DeucalionClient: Recv opcode unexpected channel {newMessage.header.channel} Opcode {newMessage.header.Opcode} message: {newMessage.debug}", "DEBUG-MACHINA");
                             break;
                         case DeucalionOpcode.Send:
                             response.Add(newMessage);
@@ -415,12 +435,16 @@ namespace Machina.FFXIV.Deucalion
                             break;
                         case DeucalionOpcode.SendOther:
                             response.Add(newMessage);
+                            else
+                                Trace.WriteLine($"DeucalionClient: Send opcode unexpected channel {newMessage.header.channel} Opcode {newMessage.header.Opcode} message: {newMessage.debug}", "DEBUG-MACHINA");
                             break;
                         case DeucalionOpcode.Exit:
                             Trace.WriteLine("DeucalionClient: Received exit opcode from injected code.", "DEBUG-MACHINA");
                             Disconnect();
                             break;
                         case DeucalionOpcode.Option:
+                        case DeucalionOpcode.RecvOther:
+                        case DeucalionOpcode.SendOther:
                         default:
                             Trace.WriteLine($"DeucalionClient: Unexpected opcode {((DeucalionHeader*)ptr)->Opcode} from injected code.", "DEBUG-MACHINA");
                             break;
@@ -473,7 +497,7 @@ namespace Machina.FFXIV.Deucalion
 
             if (_clientStream != null && _clientStream.IsConnected)
             {
-             //_clientStream.Flush();
+                //_clientStream.Flush();
                 _clientStream.Close();
             }
             _clientStream?.Dispose();

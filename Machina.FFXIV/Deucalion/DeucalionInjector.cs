@@ -91,7 +91,6 @@ namespace Machina.FFXIV.Deucalion
             MEM_RESERVE = 0x00002000,
         }
 
-
         private enum SE_OBJECT_TYPE
         {
             SE_UNKNOWN_OBJECT_TYPE,
@@ -122,49 +121,78 @@ namespace Machina.FFXIV.Deucalion
 
         #endregion
 
-        private static readonly string _resourceFileName = "deucalion-0.9.3.dll";
-        public static string ExtractLibrary()
+        /// <summary>
+        /// Returns the last error, if any, encountered during injection.
+        /// </summary>
+        public static string LastInjectionError { get; internal set; }
+
+        /// <summary>
+        /// Specifies the Game region - Korean or Global.  Required to distinguish between expected Deucalion dll versions.
+        /// </summary>
+        public static GameRegion GameRegion { get; set; } = GameRegion.Global;
+
+        /// <summary>
+        /// returns the expected Deucalion file name based on the Game Region
+        /// </summary>
+        public static string DeucalionFileName
         {
-            string fileName = Path.Combine(Path.GetTempPath(), "Machina.FFXIV", _resourceFileName);
-            if (File.Exists(fileName))
+            get
             {
-                try
-                {
-                    File.Delete(fileName);
-                }
-                catch (Exception)
-                {
-                    // do nothing - file may be locked by ffxiv process.
-                }
+                return GameRegion == GameRegion.Korean ? "deucalion-1.2.1.dll" : "deucalion-1.3.2.dll";
+            }
+        }
+
+        /// <summary>
+        /// Minimum version of Deucalion supported by Machina
+        /// </summary>
+        public static Version DeucalionVersion
+        {
+            get
+            {
+                return GameRegion == GameRegion.Korean ?
+                    new Version(1, 2, 0) :// supports 1.2.0 + 1.2.1
+                    new Version(1, 3, 2);
+            }
+        }
+
+        /// <summary>
+        /// Stores the folder where Deucalion should be loaded from
+        ///   Defaults to the current working directory
+        /// </summary>
+        public static string DeucalionPath { get; set; } = Environment.CurrentDirectory;
+
+        private static string _checksum
+        {
+            get
+            {
+                return GameRegion == GameRegion.Korean ?
+                    //"19-94-1f-2b-ff-b9-d5-1f-92-cd-60-10-5d-25-cd-19-0c-65-78-0f-6c-a0-70-8b-d8-48-3a-4a-fd-df-ea-93" : // 1.1.0
+                    "ea-bf-ff-9e-6c-f5-84-2f-97-78-1b-ae-66-9d-5b-2b-40-56-a5-88-1b-ed-e2-9c-94-24-b4-62-6c-8f-56-6e" : // 1.2.1
+                    "dd-7d-d4-10-6f-8b-ad-01-b3-ed-4b-85-b7-50-99-ed-16-0a-c6-c3-af-86-6d-26-0f-f2-9f-82-2b-c1-fc-06"; // 1.3.2
+            }
+        }
+
+        public static bool ValidateLibraryChecksum()
+        {
+            string deucalionFile = Path.Combine(DeucalionPath, DeucalionFileName);
+            if (!File.Exists(deucalionFile))
+            {
+                LastInjectionError = $"DeucalionInjector: Cannot find file [{deucalionFile}].  Deucalion cannot be used.";
+                Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
+                return false;
             }
 
-            if (!File.Exists(fileName))
-            {
-
-                if (!Directory.Exists(fileName.Substring(0, fileName.LastIndexOf("\\", StringComparison.Ordinal) + 1)))
-                    _ = Directory.CreateDirectory(fileName.Substring(0, fileName.LastIndexOf("\\", StringComparison.Ordinal) + 1));
-
-                string resourceName = $"Machina.FFXIV.Deucalion.Distrib.{_resourceFileName}";
-                using (Stream s = typeof(DeucalionInjector).Module.Assembly.GetManifestResourceStream(resourceName))
-                {
-                    using (BinaryReader sr = new BinaryReader(s))
-                    {
-                        byte[] fileData = sr.ReadBytes((int)s.Length);
-                        File.WriteAllBytes(fileName, fileData);
-                    }
-                }
-            }
-
-            string release_checksum = "16-99-AB-21-7A-1C-BB-8D-E8-7A-37-08-3F-A1-EA-A8-17-60-BE-A4-03-B5-B5-A8-CC-BD-E2-2A-C0-0C-C8-BC";
 
             // validate checksum
-            byte[] checksum = CalculateChecksum(fileName);
-            if (BitConverter.ToString(checksum) != release_checksum)
+            byte[] checksum = CalculateChecksum(deucalionFile);
+            if (!string.Equals(BitConverter.ToString(checksum), _checksum, StringComparison.OrdinalIgnoreCase))
             {
-                Trace.WriteLine($"DeucalionInjector: File checksum is invalid, cannot inject dll at {fileName}", "DEBUG-MACHINA");
-                return string.Empty;
+                LastInjectionError = $"DeucalionInjector: File checksum is invalid, cannot use dll {deucalionFile}";
+                Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
+                return false;
             }
-            return fileName;
+
+            return true;
         }
 
         public static byte[] CalculateChecksum(string filename)
@@ -177,11 +205,13 @@ namespace Machina.FFXIV.Deucalion
                 }
             }
         }
-        public static bool InjectLibrary(int processId, string deucalionPath)
+        public static bool InjectLibrary(int processId)
         {
-            if (!File.Exists(deucalionPath))
+            string deucalionFile = Path.Combine(DeucalionPath, DeucalionFileName);
+            if (!File.Exists(deucalionFile))
             {
-                Trace.WriteLine($"DeucalionInjector: Cannot find the Deucalion library at {deucalionPath}.", "DEBUG-MACHINA");
+                LastInjectionError = $"DeucalionInjector: Cannot find the Deucalion library at {deucalionFile}.";
+                Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
                 return false;
             }
 
@@ -198,7 +228,8 @@ namespace Machina.FFXIV.Deucalion
                     processId);
                 if (procHandle == IntPtr.Zero)
                 {
-                    Trace.WriteLine($"DeucalionInjector: Unable to call OpenProcess with id {processId}.", "DEBUG-MACHINA");
+                    LastInjectionError = $"DeucalionInjector: Unable to call OpenProcess with id {processId}.";
+                    Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
                     return false;
                 }
 
@@ -207,7 +238,7 @@ namespace Machina.FFXIV.Deucalion
                 if (loadLibraryAddr == IntPtr.Zero)
                     return false;
 
-                byte[] filenameBytes = Encoding.Unicode.GetBytes(deucalionPath);
+                byte[] filenameBytes = Encoding.Unicode.GetBytes(deucalionFile);
 
                 // Allocate memory in remote process to load the DLL name
                 IntPtr allocMemAddress = VirtualAllocEx(
@@ -217,7 +248,8 @@ namespace Machina.FFXIV.Deucalion
                     (uint)(MemoryProtection.MEM_COMMIT | MemoryProtection.MEM_RESERVE), (uint)MemoryProtection.PAGE_READWRITE);
                 if (allocMemAddress == IntPtr.Zero)
                 {
-                    Trace.WriteLine($"DeucalionInjector: Unable to allocate memory in process id {processId}.", "DEBUG-MACHINA");
+                    LastInjectionError = $"DeucalionInjector: Unable to allocate memory in process id {processId}.";
+                    Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
                     return false;
                 }
 
@@ -229,7 +261,8 @@ namespace Machina.FFXIV.Deucalion
                     out UIntPtr bytesWritten);
                 if (result == false || bytesWritten == UIntPtr.Zero)
                 {
-                    Trace.WriteLine($"DeucalionInjector: Unable to write filename to memory in process id {processId}.", "DEBUG-MACHINA");
+                    LastInjectionError = $"DeucalionInjector: Unable to write filename to memory in process id {processId}.";
+                    Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
                     return false;
                 }
 
@@ -237,7 +270,8 @@ namespace Machina.FFXIV.Deucalion
                 threadHandle = CreateRemoteThread(procHandle, IntPtr.Zero, 0, loadLibraryAddr, allocMemAddress, 0, IntPtr.Zero);
                 if (threadHandle == IntPtr.Zero)
                 {
-                    Trace.WriteLine($"DeucalionInjector: Unable to start remote thread in process id {processId}.", "DEBUG-MACHINA");
+                    LastInjectionError = $"DeucalionInjector: Unable to start remote thread in process id {processId}.";
+                    Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
                     return false;
                 }
 
@@ -247,7 +281,8 @@ namespace Machina.FFXIV.Deucalion
             }
             catch (Exception ex)
             {
-                Trace.WriteLine($"DeucalionInjector: Unexpected error in Injectlibrary for {processId}: {ex}", "DEBUG-MACHINA");
+                LastInjectionError = $"DeucalionInjector: Unexpected error in Injectlibrary for {processId}: {ex}";
+                Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
                 return false;
             }
             finally
@@ -274,14 +309,16 @@ namespace Machina.FFXIV.Deucalion
                     processId);
                 if (procHandle == IntPtr.Zero)
                 {
-                    Trace.WriteLine($"DeucalionInjector: Unable to call limited OpenProcess on process id {processId}.", "DEBUG-MACHINA");
+                    LastInjectionError = $"DeucalionInjector: Unable to call limited OpenProcess on process id {processId}.";
+                    Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
                     return false;
                 }
 
                 uint result = GetSecurityInfo(Process.GetCurrentProcess().Handle, SE_OBJECT_TYPE.SE_KERNEL_OBJECT, SECURITY_INFORMATION.DACL_SECURITY_INFORMATION, IntPtr.Zero, IntPtr.Zero, out IntPtr dacl, IntPtr.Zero, out pSecurityDescriptor);
                 if (result != 0 || pSecurityDescriptor == IntPtr.Zero)
                 {
-                    Trace.WriteLine($"DeucalionInjector: Unable to query security info from process {processId}.", "DEBUG-MACHINA");
+                    LastInjectionError = $"DeucalionInjector: Unable to query security info from process {processId}.";
+                    Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
                     return false;
                 }
 
@@ -289,20 +326,23 @@ namespace Machina.FFXIV.Deucalion
                 //IntPtr dacl = ((SECURITY_DESCRIPTOR*)pSecurityDescriptor)->Dacl;
                 if (dacl == IntPtr.Zero)
                 {
-                    Trace.WriteLine($"DeucalionInjector: DACL struct is null for process id {processId}.", "DEBUG-MACHINA");
+                    LastInjectionError = $"DeucalionInjector: DACL struct is null for process id {processId}.";
+                    Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
                     return false;
                 }
 
                 result = SetSecurityInfoByHandle(procHandle, SE_OBJECT_TYPE.SE_KERNEL_OBJECT, SECURITY_INFORMATION.DACL_SECURITY_INFORMATION | SECURITY_INFORMATION.UNPROTECTED_DACL_SECURITY_INFORMATION, IntPtr.Zero, IntPtr.Zero, dacl, IntPtr.Zero);
                 if (result != 0)
                 {
-                    Trace.WriteLine($"DeucalionInjector: Unable to query security info from process {processId}.", "DEBUG-MACHINA");
+                    LastInjectionError = $"DeucalionInjector: Unable to query security info from process {processId}.";
+                    Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                Trace.WriteLine($"DeucalionInjector: Exception while updating Process DACL for process {processId}.  {ex}", "DEBUG-MACHINA");
+                LastInjectionError = $"DeucalionInjector: Exception while updating Process DACL for process {processId}.  {ex}";
+                Trace.WriteLine(LastInjectionError, "DEBUG-MACHINA");
                 return false;
             }
             finally

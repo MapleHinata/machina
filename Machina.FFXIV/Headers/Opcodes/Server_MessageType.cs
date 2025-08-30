@@ -1,4 +1,4 @@
-﻿// Copyright © 2021 Ravahn - All Rights Reserved
+﻿// Copyright © 2023 Ravahn - All Rights Reserved
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -46,6 +46,8 @@ namespace Machina.FFXIV.Headers
         public static readonly Server_MessageType PresetWaymark = Opcodes.OpcodeManager.Instance.CurrentOpcodes["PresetWaymark"];
         public static readonly Server_MessageType Waymark = Opcodes.OpcodeManager.Instance.CurrentOpcodes["Waymark"];
         public static readonly Server_MessageType SystemLogMessage = Opcodes.OpcodeManager.Instance.CurrentOpcodes["SystemLogMessage"];
+        public static readonly Server_MessageType StatusEffectListOccultCrescent = Opcodes.OpcodeManager.Instance.CurrentOpcodes["StatusEffectListOccultCrescent"];
+        public static readonly Server_MessageType StatusEffectListForay3 = Opcodes.OpcodeManager.Instance.CurrentOpcodes["StatusEffectListForay3"];
 
         public ushort InternalValue { get; private set; }
 
