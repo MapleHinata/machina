@@ -253,7 +253,7 @@ namespace Machina.FFXIV.Deucalion
                         channel = (DeucalionChannel)9000,
                         Opcode = DeucalionOpcode.Debug,
                     },
-                    data = Encoding.UTF8.GetBytes("FFXIVMon Reborn")
+                    data = Encoding.UTF8.GetBytes("FFXIVMon_Reborn")
                 }, _tokenSource.Token);
             }
             catch (Exception ex)
