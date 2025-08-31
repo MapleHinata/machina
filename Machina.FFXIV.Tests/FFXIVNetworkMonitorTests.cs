@@ -28,9 +28,9 @@ namespace Machina.FFXIV.Tests
             bool dataSent = false;
 
             FFXIVNetworkMonitor sut = new();
-            sut.MessageReceivedEventHandler = (TCPConnection connection, long epoch, byte[] data) =>
+            sut.MessageReceivedEventHandler = (TCPConnection connection, long epoch, byte[] message, int set, FFXIVNetworkMonitor.ConnectionType connectionType) =>
                 { dataReceived = true; };
-            sut.MessageSentEventHandler = (TCPConnection connection, long epoch, byte[] data) =>
+            sut.MessageSentEventHandler = (TCPConnection connection, long epoch, byte[] message, int set, FFXIVNetworkMonitor.ConnectionType connectionType) =>
                 { dataSent = true; };
             sut.Start();
             for (int i = 0; i < 500; i++)

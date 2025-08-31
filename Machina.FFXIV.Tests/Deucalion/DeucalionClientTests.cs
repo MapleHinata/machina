@@ -40,8 +40,8 @@ namespace Machina.FFXIV.Tests.Deucalion
             byte[] receivedData = null;
             byte[] sentData = null;
 
-            sut.MessageReceived = (data) => { receivedData = data; };
-            sut.MessageSent = (data) => { sentData = data; };
+            sut.MessageReceived = (data, channel, isOther) => { receivedData = data; };
+            sut.MessageSent = (data, channel, isOther) => { sentData = data; };
 
             sut.Connect(processId);
 
@@ -81,8 +81,8 @@ namespace Machina.FFXIV.Tests.Deucalion
                 byte[] receivedData = null;
                 byte[] sentData = null;
 
-                sut.MessageReceived = (data) => { receivedData = data; };
-                sut.MessageSent = (data) => { sentData = data; };
+                sut.MessageReceived = (data, channel, isOther) => { receivedData = data; };
+                sut.MessageSent = (data, channel, isOther) => { sentData = data; };
 
                 sut.Connect(processId);
 

@@ -104,7 +104,7 @@ namespace Machina.FFXIV.Tests
             Assert.AreEqual(0, sut.Messages.Count);
             Assert.AreEqual(0, TestInfrastructure.Listener.Messages.Count);
 
-            Tuple<long, byte[]> result = sut.GetNextFFXIVMessage();
+            Tuple<long, byte[], int> result = sut.GetNextFFXIVMessage();
             Assert.IsNull(result);
 
             // now, add data

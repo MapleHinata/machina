@@ -424,8 +424,6 @@ namespace Machina.FFXIV.Deucalion
                             break;
                         case DeucalionOpcode.Recv:
                             response.Add(newMessage);
-                            else
-                                Trace.WriteLine($"DeucalionClient: Recv opcode unexpected channel {newMessage.header.channel} Opcode {newMessage.header.Opcode} message: {newMessage.debug}", "DEBUG-MACHINA");
                             break;
                         case DeucalionOpcode.Send:
                             response.Add(newMessage);
@@ -435,16 +433,12 @@ namespace Machina.FFXIV.Deucalion
                             break;
                         case DeucalionOpcode.SendOther:
                             response.Add(newMessage);
-                            else
-                                Trace.WriteLine($"DeucalionClient: Send opcode unexpected channel {newMessage.header.channel} Opcode {newMessage.header.Opcode} message: {newMessage.debug}", "DEBUG-MACHINA");
                             break;
                         case DeucalionOpcode.Exit:
                             Trace.WriteLine("DeucalionClient: Received exit opcode from injected code.", "DEBUG-MACHINA");
                             Disconnect();
                             break;
                         case DeucalionOpcode.Option:
-                        case DeucalionOpcode.RecvOther:
-                        case DeucalionOpcode.SendOther:
                         default:
                             Trace.WriteLine($"DeucalionClient: Unexpected opcode {((DeucalionHeader*)ptr)->Opcode} from injected code.", "DEBUG-MACHINA");
                             break;
